@@ -1,0 +1,23 @@
+{--! main !--}
+import parser/parser
+import vendor/bernparsec
+
+def main() do
+    for true do
+        inp = input("Enter an expression (or 'exit' to quit): ")
+        if inp == "exit" then
+            return false
+        end
+
+        show(inp)
+    end
+end
+
+def show(src) do
+    result = parse_expr(src)
+    if (result["ok"]) then
+        print(src + "  =>  " + result["value"])
+    else
+        print(src + "  ->  ERROR: " + errorBundlePretty(result))
+    end
+end

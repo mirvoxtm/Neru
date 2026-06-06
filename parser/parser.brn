@@ -1,0 +1,67 @@
+{--! no-written-operators !--}
+import parser/ast
+import vendor/bernparsec
+import core
+
+-- Parser para números: inteiros ou decimais, mapeados para Num
+def wrap_num(x) -> Num(x)
+def number_value() -> orElse(float(), mapP(decimal(), int_to_double))
+def number() -> mapP(lexeme(signed(number_value())), wrap_num)
+
+-- Mapeamento de "O" para Bool(true) e "X" para Bool(false)
+def wrap_bool(s) -> case s is "O" = Bool(true) | _ = Bool(false) end
+def bool_value() -> orElse(string("O"), string("X"))
+def boolean() -> mapP(lexeme(bool_value()), wrap_bool)
+
+-- Parser de caracteres: um único caractere entre aspas simples, mapeado para Char
+def wrap_char(c) -> Char(c)
+def char_value() -> between(char('\''), char('\''), anySingle())
+def character() -> mapP(lexeme(char_value()), wrap_char)
+
+-- Parser de arrays: entre colchetes, elementos separados por vírgula, mapeados para Arr
+def wrap_arr(items) -> Arr(items)
+def array() -> mapP(brackets(sepBy(lazy(expr), symbol(","))), wrap_arr)
+
+-- Parser de expressões entre parênteses, mapeados para Paren
+def wrap_paren(e) -> Paren(e)
+def parenthesis(p) -> mapP(between(symbol("("), symbol(")"), p), wrap_paren)
+
+def wrap_if(cond, tBranch, fBranch) -> If(cond, tBranch, fBranch)
+def if_expr() -> mapP(thenP(string("{"), thenP(lazy(expr), thenP(string("\\"), thenP(lazy(expr), thenP(string("}"), lazy(expr)))))), wrap_if)
+
+-- O nosso atom() é basicamente o parseExpr do original.
+-- Ele tenta cada tipo de expressão atômica (parênteses, número, booleano, caractere, array, if) e retorna a primeira que conseguir parsear.
+def atom() -> choice([parenthesis(lazy(expr)), number(), boolean(), character(), array(), expr(), if_expr()])
+
+-- Agora definimos os parsers para os operadores, usando chainl1 para lidar com a precedência e associatividade.
+def term() -> chainl1(atom(), orElse(symbol("*"), symbol("/")), apply_op)
+def arith() -> chainl1(term(), orElse(symbol("+"), symbol("-")), apply_op)
+def expr() -> chainl1(arith(), symbol("="), apply_op)
+
+-- Função auxiliar para aplicar o operador correto com base no símbolo
+def apply_op(left, op, right) do
+    if op == "+" then
+        return Sum(left, right)
+    end
+
+    if op == "-" then
+        return Sub(left, right)
+    end
+
+    if op == "*" then
+        return Mul(left, right)
+    end
+
+    if op == "/" then
+        return Div(left, right)
+    end
+
+    if op == "=" then
+        return Eq(left, right)
+    end
+end
+
+-- A função program() é o parser principal que tenta parsear uma expressão completa, garantindo que todo o input seja consumido (com eof()).
+def program() -> before(thenP(space(), lazy(expr)), before(space(), eof()))
+-- A função parse_expr é a interface principal para o parser, que recebe uma string de input e retorna o resultado do parse.
+def parse_expr(source) -> parse(program(), "<parser>", source)
