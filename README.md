@@ -15,4 +15,4 @@ This is only a study project and i'll finish it up over time. Mostly - this is a
 [x] Conditionals
 [] Variables
 [] Array Related Stuff
-[] Other perators
+[] Other operators
