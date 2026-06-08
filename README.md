@@ -5,14 +5,14 @@ This is only a study project and i'll finish it up over time. Mostly - this is a
 
 ---
 ### Implemented Functionalities:
-[x] Abstract Syntax Tree
-[x] Parser
-[-] Evaluator
-[x] Basic Arithmetic
-[x] Booleans
-[x] REPL
-[x] Eq
-[x] Conditionals
-[] Variables
-[] Array Related Stuff
-[] Other operators
+- [x] Abstract Syntax Tree
+- [x] Parser
+- [-] Evaluator
+- [x] Basic Arithmetic
+- [x] Booleans
+- [x] REPL
+- [x] Eq
+- [x] Conditionals
+- [] Variables
+- [] Array Related Stuff
+- [] Other operators
