@@ -1,11 +1,13 @@
 {--! main !--}
+{--! abort-on-error !--}
 import parser/parser
+import parser/eval
 import vendor/bernparsec
 
 def main() do
     for true do
-        inp = input("Enter an expression (or 'exit' to quit): ")
-        if inp == "exit" then
+        inp = input("> ")
+        if inp == ":q" then
             return false
         end
 
@@ -14,10 +16,6 @@ def main() do
 end
 
 def show(src) do
-    result = parse_expr(src)
-    if (result["ok"]) then
-        print(src + "  =>  " + result["value"])
-    else
-        print(src + "  ->  ERROR: " + errorBundlePretty(result))
-    end
+    e = parse_expr(src)["value"] )| eval()
+    print "=> " + e
 end

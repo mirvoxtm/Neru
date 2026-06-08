@@ -1,67 +1,68 @@
-{--! no-written-operators !--}
+{--! abort-on-error !--}
 import parser/ast
 import vendor/bernparsec
 import core
 
 -- Parser para números: inteiros ou decimais, mapeados para Num
 def wrap_num(x) -> Num(x)
-def number_value() -> orElse(float(), mapP(decimal(), int_to_double))
-def number() -> mapP(lexeme(signed(number_value())), wrap_num)
+def number_value() -> decimalNumber() <|> (int_to_double <$> digits())
+def number() -> wrap_num <$> token(withSign(number_value()))
 
 -- Mapeamento de "O" para Bool(true) e "X" para Bool(false)
 def wrap_bool(s) -> case s is "O" = Bool(true) | _ = Bool(false) end
-def bool_value() -> orElse(string("O"), string("X"))
-def boolean() -> mapP(lexeme(bool_value()), wrap_bool)
+def bool_value() -> text("O") <|> text("X")
+def boolean() -> wrap_bool <$> token(bool_value())
 
 -- Parser de caracteres: um único caractere entre aspas simples, mapeado para Char
 def wrap_char(c) -> Char(c)
-def char_value() -> between(char('\''), char('\''), anySingle())
-def character() -> mapP(lexeme(char_value()), wrap_char)
+def char_value() -> literalChar('\'') *> anyChar() <* literalChar('\'')
+def character() -> wrap_char <$> token(char_value())
 
 -- Parser de arrays: entre colchetes, elementos separados por vírgula, mapeados para Arr
 def wrap_arr(items) -> Arr(items)
-def array() -> mapP(brackets(sepBy(lazy(expr), symbol(","))), wrap_arr)
+def array() -> wrap_arr <$> inBrackets(separatedBy(lazy(expr), text(",")))
 
 -- Parser de expressões entre parênteses, mapeados para Paren
 def wrap_paren(e) -> Paren(e)
-def parenthesis(p) -> mapP(between(symbol("("), symbol(")"), p), wrap_paren)
+def parenthesis(p) -> wrap_paren <$> inParens(p)
 
+-- Parser de if: { cond \ tBranch } fBranch
+-- Usamos <$>/<*> para capturar as três sub-expressões de forma applicativa.
 def wrap_if(cond, tBranch, fBranch) -> If(cond, tBranch, fBranch)
-def if_expr() -> mapP(thenP(string("{"), thenP(lazy(expr), thenP(string("\\"), thenP(lazy(expr), thenP(string("}"), lazy(expr)))))), wrap_if)
+def if_expr() -> wrap_if <$> (symbol("{") *> lazy(expr)) <*> (symbol("\\") *> lazy(expr)) <*> (symbol("}") *> lazy(expr))
 
 -- O nosso atom() é basicamente o parseExpr do original.
 -- Ele tenta cada tipo de expressão atômica (parênteses, número, booleano, caractere, array, if) e retorna a primeira que conseguir parsear.
-def atom() -> choice([parenthesis(lazy(expr)), number(), boolean(), character(), array(), expr(), if_expr()])
+def atom() -> firstOf([parenthesis(lazy(expr)), number(), boolean(), character(), array(), if_expr()])
 
--- Agora definimos os parsers para os operadores, usando chainl1 para lidar com a precedência e associatividade.
-def term() -> chainl1(atom(), orElse(symbol("*"), symbol("/")), apply_op)
-def arith() -> chainl1(term(), orElse(symbol("+"), symbol("-")), apply_op)
-def expr() -> chainl1(arith(), symbol("="), apply_op)
-
--- Função auxiliar para aplicar o operador correto com base no símbolo
-def apply_op(left, op, right) do
+-- Função auxiliar para aplicar o operador correto com base no símbolo.
+-- A ordem dos argumentos (op primeiro) reflete a forma prefixa: lemos o
+-- operador e em seguida os dois operandos.
+def apply_op(op, left, right) do
     if op == "+" then
         return Sum(left, right)
-    end
-
-    if op == "-" then
+    else if op == "-" then
         return Sub(left, right)
-    end
-
-    if op == "*" then
+    else if op == "*" then
         return Mul(left, right)
-    end
-
-    if op == "/" then
+    else if op == "/" then
         return Div(left, right)
-    end
-
-    if op == "=" then
+    else if op == "=" then
         return Eq(left, right)
+    else
+        error("Unknown operator: " + op)
     end
 end
 
--- A função program() é o parser principal que tenta parsear uma expressão completa, garantindo que todo o input seja consumido (com eof()).
-def program() -> before(thenP(space(), lazy(expr)), before(space(), eof()))
+-- Em forma prefixa não há precedência nem associatividade a resolver: cada
+-- operador é simplesmente um símbolo seguido dos seus dois operandos.
+def op_symbol() -> firstOf([symbol("+"), symbol("-"), symbol("*"), symbol("/"), symbol("=")])
+def operation() -> apply_op <$> op_symbol() <*> lazy(expr) <*> lazy(expr)
+
+-- Uma expressão é uma operação prefixa ou, na sua ausência, um átomo.
+def expr() -> firstOf([operation(), atom()])
+
+-- A função program() é o parser principal que tenta parsear uma expressão completa, garantindo que todo o input seja consumido (com endOfInput()).
+def program() -> space() *> lazy(expr) <* space() <* endOfInput()
 -- A função parse_expr é a interface principal para o parser, que recebe uma string de input e retorna o resultado do parse.
 def parse_expr(source) -> parse(program(), "<parser>", source)

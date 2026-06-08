@@ -1,1 +1,11 @@
-adt Expression = Num Double | Bool Bool | Char Char | Arr List | Sum Expression Expression | Sub Expression Expression | Mul Expression Expression | Div Expression Expression | Paren Expression | If Expression Expression Expression | Eq Expression Expression
+adt Expression = Num Double
+               | Bool Bool
+               | Char Char
+               | Arr List
+               | Sum Expression Expression
+               | Sub Expression Expression
+               | Mul Expression Expression
+               | Div Expression Expression
+               | Paren Expression
+               | If Expression Expression Expression
+               | Eq Expression Expression

@@ -1,0 +1,17 @@
+{--! impure-lists !--}
+{--! abort-on-error !--}
+import parser/ast
+import parser/parser
+
+def eval(Num(n)) -> n
+def eval(Bool(b)) -> if b == true then "O" else "X" end
+def eval(Char(c)) -> c
+def eval(Arr(items)) -> map(eval, items)
+def eval(Paren(e)) -> eval(e)
+def eval(Sum(e1, e2)) -> eval(e1) + eval(e2)
+def eval(Sub(e1, e2)) -> eval(e1) - eval(e2)
+def eval(Mul(e1, e2)) -> eval(e1) * eval(e2)
+def eval(Div(e1, e2)) -> eval(e1) / eval(e2)
+def eval(Eq(e1, e2)) -> if eval(e1) == eval(e2) then "O" else "X" end
+def eval(If(cond, tBranch, fBranch)) -> if eval(cond) == "O" then eval(tBranch) else eval(fBranch) end
+def eval(_) -> "<undefined>"
