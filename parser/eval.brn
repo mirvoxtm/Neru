@@ -2,16 +2,132 @@
 {--! abort-on-error !--}
 import parser/ast
 import parser/parser
+import core
 
+-- Um numero avalia para ele mesmo
 def eval(Num(n)) -> n
+
+-- Um booleano avalia para "O" se for true e "X" se for false
 def eval(Bool(b)) -> if b == true then "O" else "X" end
+
+-- Um caractere avalia para ele mesmo
 def eval(Char(c)) -> c
-def eval(Arr(items)) -> map(eval, items)
+
+-----------------------------------------------------------------------------------
+
+-- Avaliação de arrays: verificamos se todos os elementos são do mesmo tipo e,
+-- em caso afirmativo, concatenamos suas representações textuais.
+def eval(Arr(items)) -> if is_error(items) then "<array elements must share a type>" else arr_text("[", items) end
+
+-- Montando a representação textual de um array, verificando o tipo dos elementos.
+def arr_text(acc, []) -> acc + "]"
+def arr_text(acc, [x]) -> acc + eval(x) + "]"
+def arr_text(acc, [x|xs]) -> arr_text(acc + eval(x) + ", ", xs)
+
+-----------------------------------------------------------------------------------
+
+-- Função auxiliar para concatenar listas de listas em uma única lista (flatten).
+def flatten([]) -> []
+def flatten([x|xs]) -> append(x, flatten(xs))
+
+-----------------------------------------------------------------------------------
+
+-- (+ x y) => eval(x) + eval(y)
 def eval(Paren(e)) -> eval(e)
+
+-----------------------------------------------------------------------------------
+
+-- Sum of Arrays
+-- + [1,2,3] [4,5] => [1,2,3,4,5]
+def eval(Sum(Arr(items1), Arr(items2))) -> eval(Arr(items1 <> items2))
+-- + [1,2,3] 4 => [1,2,3,4]
+def eval(Sum(Arr(items), e2)) -> eval(Arr(items <> [e2]))
+-- + 1 [2,3] => [1+1, 1+2, 1+3] => [2,3,4]
+def eval(Sum(e1, Arr(items))) -> eval(Arr(map(items, \x -> Sum(e1, x))))
+
+-- Sum of Strings
+-- + 'a' 'b' => "ab"
+def eval(Sum(Char(c1), Char(c2))) -> eval(Arr([Char(c1), Char(c2)]))
+-- + 'a' "bc" => "abc"
+def eval(Sum(Char(c), Arr(items))) -> eval(Arr([Char(c)] <> items))
+-- + "ab" 'c' => "abc"
+def eval(Sum(Arr(items), Char(c))) -> eval(Arr(items <> [Char(c)]))
+-- + 'a' 1 => "a1"
+def eval(Sum(Char(c), e2)) -> eval(Arr([Char(c), e2]))
+-- + 1 'a' => "1a"
+def eval(Sum(e1, Char(c))) -> eval(Arr([e1, Char(c)]))
+
+-- Sum of Numbers
 def eval(Sum(e1, e2)) -> eval(e1) + eval(e2)
+
+-----------------------------------------------------------------------------------
+
+-- Subtraction of Arrays
+-- - [1,2,3] [2] => [1,3]
+def eval(Sub(Arr(items1), Arr(items2))) -> eval(Arr(filter(items1, \x -> not (elem(x, items2)))))
+-- - [1,2,3] 2 => [1,3]
+def eval(Sub(Arr(items), e2)) -> eval(Arr(filter(items, \x -> x != e2)))
+-- - 1 [1,2,3] => [1-1, 1-2, 1-3] => [0, -1, -2]
+def eval(Sub(e1, Arr(items))) -> eval(Arr(map(items, \x -> Sub(e1, x))))
+
+-- Subtraction of Strings
+-- - "abc" 'b' => "ac"
+def eval(Sub(Arr(items), Char(c))) -> eval(Arr(filter(items, \x -> x != Char(c))))
+-- - 'a' "abc" => "bc"
+def eval(Sub(Char(c), Arr(items))) -> eval(Arr(filter(items, \x -> x != Char(c))))
+-- - "abc" "b" => "ac"
+def eval(Sub(Arr(items), Arr(chars))) -> eval(Arr(filter(items, \x -> not (elem(x, chars)))))
+-- - 'a' 'b' => "a" (removemos 'b' de "a", mas como 'b' não está presente, "a" permanece)
+def eval(Sub(Char(c1), Char(c2))) -> if c1 == c2 then "" else Char(c1) end
+
+-- Subtraction of Numbers
 def eval(Sub(e1, e2)) -> eval(e1) - eval(e2)
+
+-----------------------------------------------------------------------------------
+
+-- Multiplication of Numbers
 def eval(Mul(e1, e2)) -> eval(e1) * eval(e2)
+-- * 3 [1,2,3] => [3*1, 3*2, 3*3] => [3,6,9]
+def eval(Mul(e1, Arr(items))) -> eval(Arr(map(items, \x -> Mul(e1, x))))
+-- * [1,2,3] 3 => [[1,2,3],[1,2,3],[1,2,3]] (repetição de arrays)
+def eval(Mul(Arr(items), e2)) -> eval(Arr(flatten(map(items, \x -> Arr([x, e2])))))
+-- Same logic with strings: * "abc" 3 => "abcabcabc"
+def eval(Mul(Arr(items), e2)) -> eval(Arr(flatten(map(items, \x -> Arr([x, e2])))))
+-- BUT * 3 "abc" => acts as a take() so "abcdef" * 3 => "abc" because
+-- Teto is just that silly
+def eval(Mul(e1, Arr(items))) -> eval(Arr(take(items, eval(e1))))
+
+-- In relation to operations with Chars, this is what happens
+-- * 'a' 3 => "aaa"
+def eval(Mul(Char(c), e2)) -> eval(Arr(flatten(map(range(eval(e2)), \_ -> Arr([Char(c)])))))
+-- * 3 'a' => ['a', 'a', 'a']
+def eval(Mul(e1, Char(c))) -> eval(Arr(flatten(map(range(eval(e1)), \_ -> Arr([Char(c)])))))
+-- * 'a' "abc" => "a" (acts as a filter)
+def eval(Mul(Char(c), Arr(items))) -> eval(Arr(filter(items, \x -> x == Char(c))))
+-- * "abc" 'a' => "bc" (acts as a filter)
+def eval(Mul(Arr(items), Char(c))) -> eval(Arr(filter(items, \x -> x == Char(c))))
+
+-------------------------------------------------------------------------------------
+
+-- Division of Numbers
 def eval(Div(e1, e2)) -> eval(e1) / eval(e2)
+-- Division of an Array by a Number: / [1,2,3] 2 => [[1,2][3]] literally halves it
+def eval(Div(Arr(items), e2)) -> eval(Arr(take(items, eval(e2))))
+-- Division of a Number by an Array: / 6 [1,2] => [1/6, 2/6] => [0.166..., 0.333...]
+def eval(Div(e1, Arr(items))) -> eval(Arr(map(items, \x -> Div(e1, x))))
+-- Division of a String by a Number: / "abcdef" 3 => acts as halfing the string, so ["abc", "def"]
+def eval(Div(Arr(items), e2)) -> eval(Arr(take(items, eval(e2))))
+-- Division of a String by a Char: / "abc" 'b' => "ac" (acts as a filter)
+def eval(Div(Arr(items), Char(c))) -> eval(Arr(filter(items, \x -> x != Char(c))))
+-- Division of a Char by a String: / 'b' "abc" => "a" (acts as a filter)
+def eval(Div(Char(c), Arr(items))) -> eval(Arr(filter(items, \x -> x != Char(c))))
+
+-------------------------------------------------------------------------------------
+
 def eval(Eq(e1, e2)) -> if eval(e1) == eval(e2) then "O" else "X" end
+def eval(Neq(e1, e2)) -> if eval(e1) != eval(e2) then "O" else "X" end
+
+-------------------------------------------------------------------------------------
+
 def eval(If(cond, tBranch, fBranch)) -> if eval(cond) == "O" then eval(tBranch) else eval(fBranch) end
 def eval(_) -> "<undefined>"

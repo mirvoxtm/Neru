@@ -9,3 +9,4 @@ adt Expression = Num Double
                | Paren Expression
                | If Expression Expression Expression
                | Eq Expression Expression
+               | Neq Expression Expression

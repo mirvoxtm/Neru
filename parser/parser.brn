@@ -20,7 +20,7 @@ def character() -> wrap_char <$> token(char_value())
 
 -- Parser de arrays: entre colchetes, elementos separados por vírgula, mapeados para Arr
 def wrap_arr(items) -> Arr(items)
-def array() -> wrap_arr <$> inBrackets(separatedBy(lazy(expr), text(",")))
+def array() -> wrap_arr <$> inBrackets(separatedBy(lazy(expr), symbol(",")))
 
 -- Parser de expressões entre parênteses, mapeados para Paren
 def wrap_paren(e) -> Paren(e)
@@ -49,6 +49,8 @@ def apply_op(op, left, right) do
         return Div(left, right)
     else if op == "=" then
         return Eq(left, right)
+    else if op == "~" then
+        return Neq(left, right)
     else
         error("Unknown operator: " + op)
     end
@@ -56,7 +58,7 @@ end
 
 -- Em forma prefixa não há precedência nem associatividade a resolver: cada
 -- operador é simplesmente um símbolo seguido dos seus dois operandos.
-def op_symbol() -> firstOf([symbol("+"), symbol("-"), symbol("*"), symbol("/"), symbol("=")])
+def op_symbol() -> firstOf([symbol("+"), symbol("-"), symbol("*"), symbol("/"), symbol("="), symbol("~")])
 def operation() -> apply_op <$> op_symbol() <*> lazy(expr) <*> lazy(expr)
 
 -- Uma expressão é uma operação prefixa ou, na sua ausência, um átomo.
